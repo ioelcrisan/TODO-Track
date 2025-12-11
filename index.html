@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <title>TODO Track – Advanced</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <style>
+    :root {
+      --bg:#0f1220; --card:#171a2b; --panel:#1e2236; --muted:#9aa4b2; --text:#e6e9ef;
+      --brand:#8c8d96; --brand2:#393447; --radius:14px; --shadow:0 12px 35px rgba(0,0,0,.28);
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; background:var(--bg); color:var(--text);
+      font-family:system-ui, sans-serif;
+      display:flex; height:100vh; overflow:hidden;
+    }
+
+    /* Sidebar */
+    .sidebar{
+      width:240px; background:#131626; padding:20px;
+      display:flex; flex-direction:column; gap:20px;
+      box-shadow:var(--shadow);
+    }
+    .logo{font-size:22px; font-weight:700; display:flex; gap:10px; align-items:center}
+    .logo-badge{
+      background:linear-gradient(135deg,var(--brand),var(--brand2));
+      padding:0 10px; height:38px; display:grid; place-items:center;
+      color:white; border-radius:10px; box-shadow:var(--shadow)
+    }
+
+    .sidebar button{
+      padding:12px; width:100%;
+      border-radius:var(--radius); border:1px solid #2a2e45;
+      background:#1d2033; color:var(--text); font-weight:600; cursor:pointer;
+    }
+    .sidebar button:hover{background:#252a41}
+
+    /* Main */
+    .main{flex:1; padding:25px; overflow-y:auto}
+    .card{
+      background:var(--card); padding:20px;
+      border-radius:var(--radius); box-shadow:var(--shadow);
+      margin-bottom:20px;
+    }
+
+    table{width:100%; border-collapse:collapse; margin-top:10px}
+    th,td{padding:12px; border-bottom:1px solid #2a2e45; text-align:left}
+
+    .badge{padding:6px 10px; border-radius:8px; font-weight:700; font-size:12px}
+    .ok{background:#213a2d; color:#7ef7ba; border:1px solid #3ddc97}
+    .warn{background:#3a331f; color:#ffe08c; border:1px solid #ffd166}
+    .block{background:#3a1f1f; color:#ffb3b3; border:1px solid #ff6b6b}
+
+    .tag{padding:4px 8px; border-radius:8px; background:#252a41; border:1px solid #303551; font-size:12px}
+
+    /* Modal */
+    .modal-bg{
+      position:fixed; inset:0; display:none;
+      background:rgba(0,0,0,.65); justify-content:center; align-items:center;
+      padding:20px; z-index:1000;
+    }
+    .modal{
+      background:var(--panel); padding:25px;
+      border-radius:var(--radius); width:100%; max-width:420px;
+      box-shadow:var(--shadow);
+    }
+    input,select{
+      width:100%; padding:10px; border-radius:var(--radius);
+      border:1px solid #2a2e45; margin-top:10px;
+      background:#14182a; color:white;
+    }
+    .modal button{
+      padding:12px; margin-top:12px; width:100%;
+      border:none; border-radius:var(--radius);
+      background:var(--brand); font-weight:700; cursor:pointer;
+      color:white;
+    }
+    .modal button:hover{background:var(--brand2)}
+  </style>
+</head>
+
+<body>
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="logo">
+      <div class="logo-badge">TODO</div>
+      TODO Track
+    </div>
+
+    <button id="btnNewProject">Neues Projekt</button>
+    <button id="btnNewTask">Neue Aufgabe</button>
+
+    <!-- Neuer Button: ALLE Projekte löschen -->
+    <button id="btnDeleteAll" style="background:#8b0000;border-color:#aa0000;">Alle Projekte löschen</button>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+    <h2>Projekte</h2>
+
+    <div class="card">
+      <table id="projectTable">
+        <thead>
+          <tr>
+            <th>Projekt</th>
+            <th>Status</th>
+            <th>Tasks</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div id="projectDetail"></div>
+  </div>
+
+  <!-- MODAL: PROJEKT -->
+  <div class="modal-bg" id="modalProject">
+    <div class="modal">
+      <h3>Neues Projekt</h3>
+
+      <label>Titel
+        <input type="text" id="pTitle">
+      </label>
+
+      <label>Status
+        <select id="pStatus">
+          <option value="">— Kein Status —</option>
+          <option value="erledigt">erledigt</option>
+          <option value="bearbeitung">in Bearbeitung</option>
+          <option value="offen">offen</option>
+        </select>
+      </label>
+
+      <button id="saveProject">Speichern</button>
+      <button onclick="closeModal('modalProject')" style="background:#2a2e45;">Abbrechen</button>
+    </div>
+  </div>
+
+  <!-- MODAL: TASK -->
+  <div class="modal-bg" id="modalTask">
+    <div class="modal">
+      <h3>Neue Aufgabe</h3>
+
+      <label>Projekt
+        <select id="tProject"></select>
+      </label>
+
+      <label>Titel
+        <input type="text" id="tTitle">
+      </label>
+
+      <label>Status
+        <select id="tStatus">
+          <option value="offen">offen</option>
+          <option value="bearbeitung">in Bearbeitung</option>
+          <option value="erledigt">erledigt</option>
+        </select>
+      </label>
+
+      <button id="saveTask">Speichern</button>
+      <button onclick="closeModal('modalTask')" style="background:#2a2e45;">Abbrechen</button>
+    </div>
+  </div>
+<script>
+let data = { projects: [] };
+
+/* LOAD + SAVE */
+function load(){
+  const raw = localStorage.getItem("todotrack_advanced");
+  if (raw) data = JSON.parse(raw);
+}
+function save(){
+  localStorage.setItem("todotrack_advanced", JSON.stringify(data));
+  renderProjects();
+}
+
+/* STATUS BADGES */
+function badge(status){
+  if(status==="erledigt") return `<span class="badge ok">erledigt</span>`;
+  if(status==="bearbeitung") return `<span class="badge warn">in Bearbeitung</span>`;
+  if(status==="offen") return `<span class="badge block">offen</span>`;
+  return "–";
+}
+function taskBadge(status){
+  if(status==="offen") return `<span class="tag">offen</span>`;
+  if(status==="bearbeitung") return `<span class="tag">in Bearbeitung</span>`;
+  if(status==="erledigt") return `<span class="tag" style="color:#7ef7ba;border-color:#3ddc97;">erledigt</span>`;
+  return "–";
+}
+
+/* MODALS */
+function openModal(id){ document.getElementById(id).style.display="flex"; }
+function closeModal(id){ document.getElementById(id).style.display="none"; }
+
+/* PROJECT LIST */
+function renderProjects(){
+  const tbody = document.querySelector("#projectTable tbody");
+  tbody.innerHTML = "";
+
+  data.projects.forEach((p,i)=>{
+    tbody.innerHTML += `
+      <tr>
+        <td>${p.title}</td>
+        <td>${badge(p.status)}</td>
+        <td>${p.tasks.length}</td>
+        <td>
+          <button onclick="openDetail(${i})"
+            style="padding:6px 10px;border-radius:8px;background:#2a2e45;color:white;border:none;cursor:pointer;">
+            Details
+          </button>
+        </td>
+      </tr>
+    `;
+  });
+
+  fillProjectSelect();
+}
+
+/* TASK SELECT */
+function fillProjectSelect(){
+  const sel = document.getElementById("tProject");
+  sel.innerHTML = data.projects.map((p,i)=>`<option value="${i}">${p.title}</option>`).join("");
+}
+
+/* DETAILS */
+function openDetail(i){
+  const p = data.projects[i];
+  const box = document.getElementById("projectDetail");
+
+  box.innerHTML = `
+    <div class="card">
+      <h2>${p.title}</h2>
+      <p>Status: ${badge(p.status)}</p>
+
+      <button onclick="deleteAllTasks(${i})"
+        style="background:#aa0000;margin-top:10px;border:none;padding:10px;border-radius:8px;font-weight:700;">
+        Alle Aufgaben löschen
+      </button>
+
+      <hr>
+
+      <h3>Aufgaben</h3>
+      <table>
+        <thead>
+          <tr><th>Aufgabe</th><th>Status</th><th></th></tr>
+        </thead>
+        <tbody>
+          ${p.tasks.map((t,j)=>`
+            <tr>
+              <td>${t.title}</td>
+              <td>${taskBadge(t.status)}</td>
+              <td>
+                <button onclick="cycleTaskStatus(${i},${j})"
+                  style="padding:5px 8px;border-radius:8px;background:#2a2e45;color:white;border:none;">
+                  Status ändern
+                </button>
+              </td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+
+      <button onclick="deleteProject(${i})"
+        style="margin-top:20px;background:#ff6b6b;padding:12px;border-radius:10px;font-weight:700;">
+        Projekt löschen
+      </button>
+    </div>
+  `;
+}
+
+/* NEW FEATURE 1: Alle Aufgaben im Projekt löschen */
+function deleteAllTasks(i){
+  if(!confirm("Wirklich ALLE Aufgaben dieses Projekts löschen?")) return;
+  data.projects[i].tasks = [];
+  save();
+  openDetail(i);
+}
+
+/* NEW FEATURE 2: Alle Projekte löschen */
+document.getElementById("btnDeleteAll").onclick = ()=>{
+  if(!confirm("Wirklich ALLE Projekte löschen?")) return;
+  data.projects = [];
+  save();
+  document.getElementById("projectDetail").innerHTML = "";
+};
+
+/* CHANGE TASK STATUS */
+function cycleTaskStatus(p,t){
+  let task = data.projects[p].tasks[t];
+  if(task.status==="offen") task.status="bearbeitung";
+  else if(task.status==="bearbeitung") task.status="erledigt";
+  else task.status="offen";
+  save();
+  openDetail(p);
+}
+
+/* DELETE PROJECT */
+function deleteProject(i){
+  if(!confirm("Projekt wirklich löschen?")) return;
+  data.projects.splice(i,1);
+  save();
+  document.getElementById("projectDetail").innerHTML = "";
+}
+
+/* CREATE PROJECT */
+document.getElementById("saveProject").onclick = ()=>{
+  const title = pTitle.value.trim();
+  const status = pStatus.value;
+  if(!title) return alert("Titel fehlt.");
+
+  data.projects.push({title, status, tasks:[]});
+  save();
+  closeModal("modalProject");
+  pTitle.value = "";
+};
+
+/* CREATE TASK */
+document.getElementById("saveTask").onclick = ()=>{
+  const p = tProject.value;
+  const title = tTitle.value.trim();
+  const status = tStatus.value;
+
+  if(!title) return alert("Titel fehlt.");
+
+  data.projects[p].tasks.push({title,status});
+  save();
+  closeModal("modalTask");
+  tTitle.value = "";
+};
+
+/* SIDEBAR BTN */
+btnNewProject.onclick=()=>openModal("modalProject");
+btnNewTask.onclick=()=>{
+  if(data.projects.length===0) return alert("Zuerst ein Projekt anlegen.");
+  openModal("modalTask");
+};
+
+/* INIT */
+load();
+renderProjects();
+</script>
+
+</body>
+</html>
